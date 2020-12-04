@@ -1,5 +1,5 @@
 import { ethers } from 'ethers'
-import { walletPrivateKey, contractAddress } from '../config'
+import { walletPrivateKey, contractAddress } from '../constants'
 import contractInterface from '../abi/ERC20.abi.json'
 
 enum Networks {
@@ -18,7 +18,7 @@ export const createWeb3ContractInstance = (ethereum: any) => {
 }
 
 export const createDefaultContractInstance = () => {
-  const provider = ethers.getDefaultProvider(Networks.rinkeby.toString())
+  const provider = ethers.getDefaultProvider(Networks[Networks.rinkeby])
   const wallet = new ethers.Wallet(walletPrivateKey, provider)
   const contract = new ethers.Contract(
     contractAddress,
