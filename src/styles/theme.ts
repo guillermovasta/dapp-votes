@@ -1,4 +1,4 @@
-import { colors, createMuiTheme } from '@material-ui/core'
+import { createMuiTheme } from '@material-ui/core'
 
 export const theme = createMuiTheme({
   overrides: {
@@ -8,10 +8,16 @@ export const theme = createMuiTheme({
           WebkitFontSmoothing: 'auto'
         },
         body: {
-          backgroundColor: colors.grey['900'],
           marginTop: 24
         }
       }
     }
   }
 })
+
+export const colors = {
+  red: '#ff1744',
+  green: '#a6e22e',
+  dark: '#20232a',
+  light: '#fff'
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Contract, BigNumber } from 'ethers'
 import styled from 'styled-components'
 import {
@@ -6,17 +6,24 @@ import {
   Grid,
   Paper,
   ThemeProvider,
-  CssBaseline
+  CssBaseline,
+  CircularProgress,
+  LinearProgress
 } from '@material-ui/core'
 import {
   createDefaultContractInstance,
   createWeb3ContractInstance
 } from './utils'
-import { theme } from './styles/theme'
+import { theme, colors } from './styles/theme'
 
 interface Votes {
   yes: number
   no: number
+}
+
+enum Vote {
+  yes = 1,
+  no = 2
 }
 
 enum ProviderNames {
@@ -31,34 +38,34 @@ const App = () => {
 
   const [votes, setVotes] = useState<Votes>()
   const [contract, setContract] = useState<Contract>(defaultContract)
+  const [isFetching, setIsFetching] = useState<boolean>(false)
 
   const providerName = contract.provider.constructor.name
-  console.log(providerName)
 
-  useEffect(() => {
+  const getVotes = useCallback(async () => {
     try {
-      const getVotes = async () => {
-        console.log('getting votes')
-        const votesForYes = await contract.votesForYes()
-        const votesForNo = await contract.votesForNo()
-        setVotes({
-          yes: parseInt(votesForYes),
-          no: parseInt(votesForNo)
-        })
-      }
-      getVotes()
+      setIsFetching(true)
+      const votesForYes = await contract.votesForYes()
+      const votesForNo = await contract.votesForNo()
+      setIsFetching(false)
+      setVotes({
+        yes: parseInt(votesForYes),
+        no: parseInt(votesForNo)
+      })
     } catch (error) {
       console.log(error)
     }
-  }, [])
+  }, [contract])
+
+  useEffect(() => {
+    getVotes()
+  }, [getVotes, contract])
 
   const handleConnectToMetaMask = () => {
-    console.log('connecting to MetaMask')
     ethereum.request({ method: 'eth_requestAccounts' })
   }
 
   const handleSwitchProvider = () => {
-    console.log('switching provider')
     if (providerName === ProviderNames.FallbackProvider) {
       setContract(web3Contract)
     } else {
@@ -66,15 +73,20 @@ const App = () => {
     }
   }
 
-  const handleVote = () => {
+  const handleVote = (choice: number) => {
     try {
+      if (votes?.yes || votes?.no) {
+        return
+      }
       const vote = async () => {
-        console.log('getting VOTE_FEE')
+        setIsFetching(true)
         const voteFee = await contract.VOTE_FEE()
-        console.log('voting')
-        const voting = await contract.functions.vote(BigNumber.from(2), {
+        const voting = await contract.functions.vote(BigNumber.from(choice), {
           value: voteFee
         })
+        await voting.wait()
+        setIsFetching(false)
+        getVotes()
       }
       vote()
     } catch (error) {
@@ -85,8 +97,11 @@ const App = () => {
   const handleCleanVotes = () => {
     try {
       const clean = async () => {
-        console.log('clean votes')
-        const voting = await contract.functions.clean()
+        setIsFetching(true)
+        const cleaning = await contract.functions.clean()
+        await cleaning.wait()
+        setIsFetching(false)
+        getVotes()
       }
       clean()
     } catch (error) {
@@ -100,18 +115,26 @@ const App = () => {
       <Container>
         <Grid container spacing={3} justify="center">
           <Grid item xs={6} sm={3}>
-            <StyledPaper square>
-              <span>yes</span>
-              {votes?.yes}
+            <StyledPaper elevation={3} onClick={() => handleVote(Vote.yes)}>
+              <span>YES</span>
+              {votes && votes.yes}
             </StyledPaper>
           </Grid>
           <Grid item xs={6} sm={3}>
-            <StyledPaper square>
-              <span>no</span>
-              {votes?.yes}
+            <StyledPaper elevation={3} onClick={() => handleVote(Vote.no)}>
+              <span>NO</span>
+              {votes && votes.no}
             </StyledPaper>
           </Grid>
         </Grid>
+        <div>
+          <ActionBar>
+            <Button onClick={handleCleanVotes}>Clean Votes</Button>
+            <Button onClick={handleSwitchProvider}>Switch Provider</Button>
+            <Button onClick={handleConnectToMetaMask}>Connect MetaMask</Button>
+          </ActionBar>
+        </div>
+        {isFetching && <LinearProgress />}
       </Container>
     </ThemeProvider>
   )
@@ -121,20 +144,53 @@ export default App
 
 const StyledPaper = styled(Paper)`
   align-items: center;
-  color: red;
+  background-color: ${colors.dark};
+  color: ${colors.green};
+  cursor: pointer;
   display: flex;
   font-size: 100px;
   height: 200px;
   justify-content: center;
   position: relative;
 
+  &:hover {
+    opacity: 0.9;
+  }
+
   span {
-    color: black;
-    font-size: 30px;
-    left: 5px;
+    color: ${colors.light};
+    font-size: 24px;
+    font-weight: 300;
+    left: 10px;
     line-height: 1;
     position: absolute;
-    text-transform: uppercase;
-    top: 5px;
+    top: 10px;
+  }
+`
+
+const ActionBar = styled.div`
+  display: flex;
+  justify-content: center;
+  margin: 24px 0;
+
+  button {
+    margin-left: 3px;
+
+    &:first-child {
+      margin-left: 0;
+    }
+  }
+`
+
+const Button = styled.button`
+  background-color: ${colors.dark};
+  border: 0;
+  border-radius: 5px;
+  color: ${colors.light};
+  cursor: pointer;
+  padding: 10px;
+
+  &:hover {
+    opacity: 0.9;
   }
 `
