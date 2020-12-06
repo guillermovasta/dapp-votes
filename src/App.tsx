@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Contract, BigNumber } from 'ethers'
 import styled from 'styled-components'
 import {
@@ -7,7 +7,6 @@ import {
   Paper,
   ThemeProvider,
   CssBaseline,
-  CircularProgress,
   LinearProgress
 } from '@material-ui/core'
 import {
@@ -15,6 +14,7 @@ import {
   createWeb3ContractInstance
 } from './utils'
 import { theme, colors } from './styles/theme'
+import { walletAddress } from './constants'
 
 interface Votes {
   yes: number
@@ -22,13 +22,13 @@ interface Votes {
 }
 
 enum Vote {
-  yes = 1,
-  no = 2
+  yes = 2,
+  no = 1
 }
 
 enum ProviderNames {
   Web3Provider = 'Web3Provider',
-  FallbackProvider = 'FallbackProvider'
+  EtherscanProvider = 'EtherscanProvider'
 }
 
 const App = () => {
@@ -36,37 +36,69 @@ const App = () => {
   const web3Contract = createWeb3ContractInstance(ethereum)
   const defaultContract = createDefaultContractInstance()
 
-  const [votes, setVotes] = useState<Votes>()
-  const [contract, setContract] = useState<Contract>(defaultContract)
+  const [votesForYes, setVotesForYes] = useState<number>(0)
+  const [votesForNo, setVotesForNo] = useState<number>(0)
+  const [voted, setVoted] = useState<boolean | undefined>(undefined)
   const [isFetching, setIsFetching] = useState<boolean>(false)
+
+  const [contract, setContract] = useState<Contract>(defaultContract)
 
   const providerName = contract.provider.constructor.name
 
-  const getVotes = useCallback(async () => {
-    try {
-      setIsFetching(true)
-      const votesForYes = await contract.votesForYes()
-      const votesForNo = await contract.votesForNo()
-      setIsFetching(false)
-      setVotes({
-        yes: parseInt(votesForYes),
-        no: parseInt(votesForNo)
-      })
-    } catch (error) {
-      console.log(error)
+  useEffect(() => {
+    const getVote = async () => {
+      try {
+        setIsFetching(true)
+        const vote = await contract.functions.getVote(walletAddress)
+        setIsFetching(false)
+        // if (BigNumber.from(vote).toNumber() !== 0) {
+        if (parseInt(vote) !== 0) {
+          setVoted(true)
+        }
+      } catch (error) {
+        console.log(error)
+      }
     }
+    getVote()
   }, [contract])
 
   useEffect(() => {
+    const getVotes = async () => {
+      try {
+        setIsFetching(true)
+        const votesForYes = await contract.votesForYes()
+        const votesForNo = await contract.votesForNo()
+        setIsFetching(false)
+        setVotesForYes(BigNumber.from(votesForYes).toNumber())
+        setVotesForNo(BigNumber.from(votesForNo).toNumber())
+      } catch (error) {
+        console.log(error)
+      }
+    }
     getVotes()
-  }, [getVotes, contract])
+  }, [contract])
+
+  useEffect(() => {
+    const voteCastedListener = (proposalId: any, from: any, vote: any) => {
+      console.log('event received')
+      if (BigNumber.from(vote).toNumber() === Vote.yes) {
+        setVotesForYes(votesForYes + 1)
+      } else {
+        setVotesForNo(votesForNo + 1)
+      }
+    }
+    contract.on('VoteCasted', voteCastedListener)
+    return () => {
+      contract.off('VoteCasted', voteCastedListener)
+    }
+  }, [contract, votesForNo, votesForYes])
 
   const handleConnectToMetaMask = () => {
     ethereum.request({ method: 'eth_requestAccounts' })
   }
 
   const handleSwitchProvider = () => {
-    if (providerName === ProviderNames.FallbackProvider) {
+    if (providerName === ProviderNames.EtherscanProvider) {
       setContract(web3Contract)
     } else {
       setContract(defaultContract)
@@ -75,9 +107,6 @@ const App = () => {
 
   const handleVote = (choice: number) => {
     try {
-      if (votes?.yes || votes?.no) {
-        return
-      }
       const vote = async () => {
         setIsFetching(true)
         const voteFee = await contract.VOTE_FEE()
@@ -86,9 +115,11 @@ const App = () => {
         })
         await voting.wait()
         setIsFetching(false)
-        getVotes()
+        setVoted(true)
       }
-      vote()
+      if (!voted) {
+        vote()
+      }
     } catch (error) {
       console.log(error)
     }
@@ -101,7 +132,9 @@ const App = () => {
         const cleaning = await contract.functions.clean()
         await cleaning.wait()
         setIsFetching(false)
-        getVotes()
+        setVotesForYes(0)
+        setVotesForNo(0)
+        setVoted(false)
       }
       clean()
     } catch (error) {
@@ -117,13 +150,13 @@ const App = () => {
           <Grid item xs={6} sm={3}>
             <StyledPaper elevation={3} onClick={() => handleVote(Vote.yes)}>
               <span>YES</span>
-              {votes && votes.yes}
+              {votesForYes}
             </StyledPaper>
           </Grid>
           <Grid item xs={6} sm={3}>
             <StyledPaper elevation={3} onClick={() => handleVote(Vote.no)}>
               <span>NO</span>
-              {votes && votes.no}
+              {votesForNo}
             </StyledPaper>
           </Grid>
         </Grid>
