@@ -16,11 +16,6 @@ import {
 import { theme, colors } from './styles/theme'
 import { walletAddress } from './constants'
 
-interface Votes {
-  yes: number
-  no: number
-}
-
 enum Vote {
   yes = 2,
   no = 1
