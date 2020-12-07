@@ -35,8 +35,7 @@ const App = () => {
   const [votesForNo, setVotesForNo] = useState<number>(0)
   const [voted, setVoted] = useState<boolean | undefined>(undefined)
   const [isFetching, setIsFetching] = useState<boolean>(false)
-
-  const [contract, setContract] = useState<Contract>(defaultContract)
+  const [contract, setContract] = useState<Contract>(web3Contract)
 
   const providerName = contract.provider.constructor.name
 
@@ -74,8 +73,8 @@ const App = () => {
   }, [contract])
 
   useEffect(() => {
+    // fixme: events not working for etherscan
     const voteCastedListener = (proposalId: any, from: any, vote: any) => {
-      console.log('event received')
       if (BigNumber.from(vote).toNumber() === Vote.yes) {
         setVotesForYes(votesForYes + 1)
       } else {
